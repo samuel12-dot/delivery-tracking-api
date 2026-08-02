@@ -19,7 +19,7 @@ dependency is unavailable.
 ## Delivery milestones
 
 - [x] Service scaffold, Docker Compose, PostGIS, Redis, health endpoint
-- [ ] Database schema and spatial indexes
+- [x] Database schema and spatial indexes
 - [ ] Authentication and role authorization
 - [ ] Transactional order state machine
 - [ ] Location ingestion and nearby-driver search
@@ -27,4 +27,3 @@ dependency is unavailable.
 - [ ] Authenticated WebSocket delivery
 - [ ] Reliable webhook worker and transactional outbox
 - [ ] Rate limiting, metrics, API documentation, and load testing
-
