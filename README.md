@@ -25,7 +25,7 @@ dependency is unavailable.
 - [x] Location ingestion and nearby-driver search
 - [x] Orders and driver assignment
 - [x] Authenticated WebSocket delivery
-- [ ] Reliable webhook worker and transactional outbox
+- [x] Reliable webhook worker and transactional outbox
 - [ ] Rate limiting, metrics, API documentation, and load testing
 
 ## WebSocket events
@@ -46,3 +46,16 @@ Redis Pub/Sub is used because these are ephemeral live views: durable order
 status and location history remains in PostgreSQL, and reconnecting clients can
 rebuild state through REST. Redis Streams would add consumer state and replay
 semantics that are unnecessary for this fan-out path.
+
+## Webhook verification and retries
+
+The webhook secret is returned only when an endpoint is registered. For every
+request, compute HMAC-SHA256 over the exact raw request body using that secret,
+prefix the lowercase hexadecimal digest with `sha256=`, and compare it to
+`X-Signature` with a constant-time comparison. Persist `event_id` to deduplicate
+late retries.
+
+Delivery runs outside request processing. A failed initial attempt is retried
+after 1 second, 5 seconds, 30 seconds, 5 minutes, and 30 minutes. After six
+total attempts the delivery becomes `exhausted` and remains visible through the
+merchant delivery-history endpoint.

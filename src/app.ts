@@ -6,6 +6,7 @@ import { errorHandler, notFound } from './middleware/errors.js';
 import { authRouter } from './routes/auth.js';
 import { driversRouter } from './routes/drivers.js';
 import { customersRouter } from './routes/customers.js';
+import { merchantsRouter } from './routes/merchants.js';
 import { healthRouter } from './routes/health.js';
 import { ordersRouter } from './routes/orders.js';
 
@@ -18,6 +19,7 @@ export const createApp = () => {
   app.use('/api/v1/auth', authRouter);
   app.use('/api/v1/drivers', driversRouter);
   app.use('/api/v1/customers', customersRouter);
+  app.use('/api/v1/merchants', merchantsRouter);
   app.use('/api/v1/orders', ordersRouter);
   app.use(notFound);
   app.use(errorHandler);
