@@ -22,7 +22,7 @@ dependency is unavailable.
 - [x] Database schema and spatial indexes
 - [x] Authentication and role authorization
 - [x] Transactional order state machine
-- [ ] Location ingestion and nearby-driver search
+- [x] Location ingestion and nearby-driver search
 - [ ] Orders and driver assignment
 - [ ] Authenticated WebSocket delivery
 - [ ] Reliable webhook worker and transactional outbox
