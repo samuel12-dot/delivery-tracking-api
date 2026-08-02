@@ -1,7 +1,7 @@
 services:
   app:
     build: .
-    env_file: .env
+    env_file: ${ENV_FILE:-.env}
     environment:
       DATABASE_URL: postgresql://delivery:delivery@postgres:5432/delivery_tracking
       REDIS_URL: redis://redis:6379
@@ -44,4 +44,3 @@ services:
 volumes:
   postgres_data:
   redis_data:
-

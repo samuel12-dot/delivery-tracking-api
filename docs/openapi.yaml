@@ -1,0 +1,242 @@
+openapi: 3.0.3
+info:
+  title: Delivery Tracking API
+  version: 1.0.0
+  description: REST contract for the PostGIS and Redis-backed delivery platform.
+servers:
+  - url: http://localhost:3000/api/v1
+security:
+  - bearerAuth: []
+tags:
+  - name: Auth
+  - name: Drivers
+  - name: Orders
+  - name: Customers
+  - name: Webhooks
+paths:
+  /auth/register:
+    post:
+      tags: [Auth]
+      security: []
+      summary: Register a customer, driver, or merchant
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterRequest' }
+      responses:
+        '201': { description: Account and token pair created, content: { application/json: { schema: { $ref: '#/components/schemas/AuthResponse' } } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /auth/login:
+    post:
+      tags: [Auth]
+      security: []
+      summary: Authenticate with email and password
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/LoginRequest' } } } }
+      responses:
+        '200': { description: Authenticated, content: { application/json: { schema: { $ref: '#/components/schemas/AuthResponse' } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      security: []
+      summary: Rotate a refresh token
+      requestBody: { $ref: '#/components/requestBodies/RefreshToken' }
+      responses:
+        '200': { description: Rotated token pair, content: { application/json: { schema: { type: object, properties: { tokens: { $ref: '#/components/schemas/TokenPair' } } } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+  /auth/logout:
+    post:
+      tags: [Auth]
+      security: []
+      summary: Revoke a refresh token
+      requestBody: { $ref: '#/components/requestBodies/RefreshToken' }
+      responses:
+        '204': { description: Logged out }
+  /drivers/me/status:
+    patch:
+      tags: [Drivers]
+      summary: Change the authenticated driver's availability
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [status], properties: { status: { type: string, enum: [offline, available, unavailable] } } } } } }
+      responses:
+        '200': { description: Updated driver status }
+        '403': { $ref: '#/components/responses/Problem' }
+  /drivers/me/location:
+    post:
+      tags: [Drivers]
+      summary: Append a driver location ping
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/LocationPing' } } } }
+      responses:
+        '202': { description: Ping stored; response identifies whether current location advanced }
+        '429': { $ref: '#/components/responses/Problem' }
+  /drivers/nearby:
+    get:
+      tags: [Drivers]
+      summary: Find available drivers with PostGIS
+      parameters:
+        - { name: lat, in: query, required: true, schema: { type: number, minimum: -90, maximum: 90 } }
+        - { name: lng, in: query, required: true, schema: { type: number, minimum: -180, maximum: 180 } }
+        - { name: radius_km, in: query, required: true, schema: { type: number, exclusiveMinimum: 0, maximum: 100 } }
+        - { name: limit, in: query, schema: { type: integer, default: 50, maximum: 100 } }
+      responses:
+        '200': { description: Drivers ordered by distance }
+  /orders:
+    post:
+      tags: [Orders]
+      summary: Place a customer order
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CreateOrderRequest' } } } }
+      responses:
+        '201': { description: Order placed }
+        '403': { $ref: '#/components/responses/Problem' }
+  /orders/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/OrderId' }
+    get:
+      tags: [Orders]
+      summary: Get an order visible to the authenticated participant
+      responses:
+        '200': { description: Order detail }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /orders/{id}/assign-driver:
+    parameters:
+      - { $ref: '#/components/parameters/OrderId' }
+    post:
+      tags: [Orders]
+      summary: Assign the nearest available driver (admin)
+      responses:
+        '200': { description: Driver assigned }
+        '409': { $ref: '#/components/responses/Problem' }
+  /orders/{id}/transition:
+    parameters:
+      - { $ref: '#/components/parameters/OrderId' }
+    post:
+      tags: [Orders]
+      summary: Perform a validated order status transition
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/TransitionRequest' } } } }
+      responses:
+        '200': { description: Transition and audit event committed }
+        '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /orders/{id}/events:
+    parameters:
+      - { $ref: '#/components/parameters/OrderId' }
+    get:
+      tags: [Orders]
+      summary: Get append-only status history
+      responses:
+        '200': { description: Ordered event history }
+  /orders/{id}/eta:
+    parameters:
+      - { $ref: '#/components/parameters/OrderId' }
+    get:
+      tags: [Orders]
+      summary: Estimate arrival from driver distance and vehicle speed
+      responses:
+        '200': { description: Current ETA estimate }
+        '409': { $ref: '#/components/responses/Problem' }
+  /customers/me/orders:
+    get:
+      tags: [Customers]
+      summary: List the customer's orders with cursor pagination
+      parameters:
+        - { name: cursor, in: query, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, default: 20, maximum: 100 } }
+      responses:
+        '200': { description: Page and next cursor }
+  /merchants/me/webhooks:
+    post:
+      tags: [Webhooks]
+      summary: Register an HTTPS webhook
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [url], properties: { url: { type: string, format: uri } } } } } }
+      responses:
+        '201': { description: Webhook and one-time secret }
+    get:
+      tags: [Webhooks]
+      summary: List merchant webhooks without secrets
+      responses:
+        '200': { description: Webhook list }
+  /merchants/me/webhooks/{id}:
+    delete:
+      tags: [Webhooks]
+      summary: Deactivate a merchant webhook
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '204': { description: Deactivated }
+        '404': { $ref: '#/components/responses/Problem' }
+  /merchants/me/webhooks/{id}/deliveries:
+    get:
+      tags: [Webhooks]
+      summary: Inspect webhook delivery and retry history
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: limit, in: query, schema: { type: integer, default: 50, maximum: 100 } }
+      responses:
+        '200': { description: Delivery history including exhausted jobs }
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+  parameters:
+    OrderId: { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+  requestBodies:
+    RefreshToken:
+      required: true
+      content: { application/json: { schema: { type: object, required: [refresh_token], properties: { refresh_token: { type: string } } } } }
+  responses:
+    Problem:
+      description: RFC 7807 problem detail
+      content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } }
+  schemas:
+    TokenPair:
+      type: object
+      required: [access_token, refresh_token]
+      properties: { access_token: { type: string }, refresh_token: { type: string } }
+    AuthResponse:
+      type: object
+      properties:
+        user: { type: object, properties: { id: { type: string, format: uuid }, email: { type: string, format: email }, full_name: { type: string }, role: { type: string } } }
+        tokens: { $ref: '#/components/schemas/TokenPair' }
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties: { email: { type: string, format: email }, password: { type: string } }
+    RegisterRequest:
+      type: object
+      required: [email, password, full_name, role]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 12, maxLength: 128 }
+        full_name: { type: string }
+        role: { type: string, enum: [customer, driver, merchant] }
+        vehicle_type: { type: string, enum: [bike, car, van] }
+        merchant: { type: object, properties: { name: { type: string }, address: { type: string }, lat: { type: number }, lng: { type: number } } }
+    LocationPing:
+      type: object
+      required: [lat, lng, recorded_at]
+      properties: { lat: { type: number }, lng: { type: number }, recorded_at: { type: string, format: date-time } }
+    CreateOrderRequest:
+      type: object
+      required: [merchant_id, dropoff]
+      properties:
+        merchant_id: { type: string, format: uuid }
+        dropoff: { type: object, required: [lat, lng], properties: { lat: { type: number }, lng: { type: number } } }
+    TransitionRequest:
+      type: object
+      required: [to_status]
+      properties:
+        to_status: { $ref: '#/components/schemas/OrderStatus' }
+        expected_status: { $ref: '#/components/schemas/OrderStatus' }
+    OrderStatus: { type: string, enum: [placed, confirmed, driver_assigned, picked_up, in_transit, delivered, cancelled, failed] }
+    Problem:
+      type: object
+      required: [type, title, status, detail, instance, request_id]
+      properties:
+        type: { type: string }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+        request_id: { type: string }
+
