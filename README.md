@@ -21,7 +21,7 @@ dependency is unavailable.
 - [x] Service scaffold, Docker Compose, PostGIS, Redis, health endpoint
 - [x] Database schema and spatial indexes
 - [x] Authentication and role authorization
-- [ ] Transactional order state machine
+- [x] Transactional order state machine
 - [ ] Location ingestion and nearby-driver search
 - [ ] Orders and driver assignment
 - [ ] Authenticated WebSocket delivery
