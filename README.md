@@ -24,6 +24,25 @@ dependency is unavailable.
 - [x] Transactional order state machine
 - [x] Location ingestion and nearby-driver search
 - [x] Orders and driver assignment
-- [ ] Authenticated WebSocket delivery
+- [x] Authenticated WebSocket delivery
 - [ ] Reliable webhook worker and transactional outbox
 - [ ] Rate limiting, metrics, API documentation, and load testing
+
+## WebSocket events
+
+Connect to `WS /ws/orders/:id` with the access JWT in an `Authorization:
+Bearer <token>` header. Browser clients that cannot set upgrade headers may use
+the `access_token` query parameter over TLS; infrastructure must redact query
+strings from access logs. Only the customer, assigned driver, owning merchant,
+or an administrator can subscribe.
+
+The server sends:
+
+- `subscribed` immediately after an authorized connection is established.
+- `status_changed` after the transactional outbox publishes an order status event.
+- `driver_location_updated` after a newer driver location ping is committed.
+
+Redis Pub/Sub is used because these are ephemeral live views: durable order
+status and location history remains in PostgreSQL, and reconnecting clients can
+rebuild state through REST. Redis Streams would add consumer state and replay
+semantics that are unnecessary for this fan-out path.
