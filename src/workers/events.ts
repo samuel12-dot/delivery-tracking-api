@@ -3,6 +3,7 @@ import { db } from '../lib/postgres.js';
 import { redis } from '../lib/redis.js';
 import { logger } from '../lib/logger.js';
 import { nextWebhookRetry, signWebhookPayload, webhookMaxAttempts } from '../services/webhooks.js';
+import { webhookDeliveriesTotal } from '../lib/metrics.js';
 
 interface ClaimedDelivery {
   id: string;
@@ -92,6 +93,7 @@ export const processOneWebhookDelivery = async (
   }
 
   if (succeeded) {
+    webhookDeliveriesTotal.inc({ outcome: 'succeeded' });
     await db.query(
       `UPDATE webhook_deliveries
        SET status = 'succeeded', response_status_code = $2, next_retry_at = NULL
@@ -100,6 +102,9 @@ export const processOneWebhookDelivery = async (
     );
   } else {
     const retryAt = nextWebhookRetry(delivery.attempt_count);
+    webhookDeliveriesTotal.inc({
+      outcome: delivery.attempt_count >= webhookMaxAttempts ? 'exhausted' : 'failed',
+    });
     await db.query(
       `UPDATE webhook_deliveries
        SET status = $2, response_status_code = $3, next_retry_at = $4
@@ -172,4 +177,3 @@ export const startEventWorkers = () => {
   void tick();
   return () => clearInterval(timer);
 };
-

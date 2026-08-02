@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { HttpError } from '../middleware/errors.js';
 import { findNearbyDrivers, recordDriverLocation, updateDriverStatus } from '../services/drivers.js';
+import { createRateLimit } from '../middleware/rate-limit.js';
 
 const statusSchema = z.object({ status: z.enum(['offline', 'available', 'unavailable']) });
 const locationSchema = z.object({
@@ -19,6 +20,7 @@ const nearbySchema = z.object({
 
 export const driversRouter = Router();
 driversRouter.use(authenticate);
+const locationRateLimit = createRateLimit({ keyPrefix: 'driver_location', capacity: 30, refillPerSecond: 1 });
 
 driversRouter.patch('/me/status', authorize('driver'), async (req, res) => {
   const body = statusSchema.parse(req.body);
@@ -26,7 +28,7 @@ driversRouter.patch('/me/status', authorize('driver'), async (req, res) => {
   res.send(await updateDriverStatus(req.auth.userId, body.status));
 });
 
-driversRouter.post('/me/location', authorize('driver'), async (req, res) => {
+driversRouter.post('/me/location', authorize('driver'), locationRateLimit, async (req, res) => {
   const body = locationSchema.parse(req.body);
   if (!req.auth) throw new HttpError(401, 'Unauthorized', 'Authentication is required');
   const result = await recordDriverLocation(req.auth.userId, {
@@ -42,4 +44,3 @@ driversRouter.get('/nearby', async (req, res) => {
   const drivers = await findNearbyDrivers(query.lat, query.lng, query.radius_km, query.limit);
   res.send({ data: drivers });
 });
-

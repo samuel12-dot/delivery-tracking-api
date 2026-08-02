@@ -26,7 +26,18 @@ dependency is unavailable.
 - [x] Orders and driver assignment
 - [x] Authenticated WebSocket delivery
 - [x] Reliable webhook worker and transactional outbox
-- [ ] Rate limiting, metrics, API documentation, and load testing
+- [x] Redis token-bucket rate limiting and Prometheus metrics
+- [ ] API documentation and load testing
+
+## Observability
+
+Every HTTP request receives or preserves an `X-Request-ID` and is logged as
+structured JSON. `GET /health` checks PostgreSQL and Redis. `GET /metrics`
+exposes process metrics plus request count/latency/error status, location-ping
+latency, and webhook outcomes in Prometheus format. API traffic uses a
+Redis-backed token bucket; the higher-frequency driver location route has a
+separate per-driver bucket after authentication.
+
 
 ## WebSocket events
 

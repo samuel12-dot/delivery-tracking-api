@@ -7,6 +7,9 @@ import { authRouter } from './routes/auth.js';
 import { driversRouter } from './routes/drivers.js';
 import { customersRouter } from './routes/customers.js';
 import { merchantsRouter } from './routes/merchants.js';
+import { metricsRouter } from './routes/metrics.js';
+import { observeHttpRequest } from './middleware/metrics.js';
+import { createRateLimit } from './middleware/rate-limit.js';
 import { healthRouter } from './routes/health.js';
 import { ordersRouter } from './routes/orders.js';
 
@@ -14,8 +17,11 @@ export const createApp = () => {
   const app = express();
   app.disable('x-powered-by');
   app.use(pinoHttp({ logger, genReqId: (req) => req.headers['x-request-id']?.toString() ?? randomUUID() }));
+  app.use(observeHttpRequest);
   app.use(express.json({ limit: '1mb' }));
   app.use('/health', healthRouter);
+  app.use('/metrics', metricsRouter);
+  app.use('/api/v1', createRateLimit({ keyPrefix: 'api', capacity: 100, refillPerSecond: 10 }));
   app.use('/api/v1/auth', authRouter);
   app.use('/api/v1/drivers', driversRouter);
   app.use('/api/v1/customers', customersRouter);

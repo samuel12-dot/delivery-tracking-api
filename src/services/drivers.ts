@@ -2,6 +2,7 @@ import { db } from '../lib/postgres.js';
 import { redis } from '../lib/redis.js';
 import { logger } from '../lib/logger.js';
 import { HttpError } from '../middleware/errors.js';
+import { locationPingDuration } from '../lib/metrics.js';
 
 interface LocationInput { lat: number; lng: number; recordedAt: Date }
 
@@ -68,6 +69,7 @@ export const updateDriverStatus = async (
 };
 
 export const recordDriverLocation = async (userId: string, input: LocationInput) => {
+  const stopTimer = locationPingDuration.startTimer();
   const client = await db.connect();
   let driverId: string;
   let updated = false;
@@ -130,6 +132,6 @@ export const recordDriverLocation = async (userId: string, input: LocationInput)
     });
   }
 
+  stopTimer();
   return { accepted: true, current_location_updated: updated, driver_id: driverId };
 };
-
