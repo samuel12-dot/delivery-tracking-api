@@ -23,7 +23,7 @@ dependency is unavailable.
 - [x] Authentication and role authorization
 - [x] Transactional order state machine
 - [x] Location ingestion and nearby-driver search
-- [ ] Orders and driver assignment
+- [x] Orders and driver assignment
 - [ ] Authenticated WebSocket delivery
 - [ ] Reliable webhook worker and transactional outbox
 - [ ] Rate limiting, metrics, API documentation, and load testing

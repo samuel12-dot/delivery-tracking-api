@@ -2,6 +2,7 @@ import { db } from '../lib/postgres.js';
 import type { AuthContext, UserRole } from '../domain/auth.js';
 import { assertTransition, type OrderStatus } from '../domain/order-status.js';
 import { HttpError } from '../middleware/errors.js';
+import { writeOrderStatusChange } from './order-events.js';
 
 interface LockedOrder {
   id: string;
@@ -65,37 +66,7 @@ export const transitionOrder = async (
       'UPDATE orders SET status = $1, updated_at = now() WHERE id = $2',
       [toStatus, orderId],
     );
-    const eventResult = await client.query<{ id: string; occurred_at: Date }>(
-      `INSERT INTO order_status_events
-         (order_id, from_status, to_status, changed_by, changed_by_system)
-       VALUES ($1, $2, $3, $4, false)
-       RETURNING id, occurred_at`,
-      [orderId, order.status, toStatus, actor.userId],
-    );
-    const event = eventResult.rows[0];
-    if (!event) throw new Error('Status event insert returned no row');
-
-    await client.query(
-      `INSERT INTO webhook_deliveries (webhook_id, order_status_event_id)
-       SELECT w.id, $1
-       FROM webhooks w
-       JOIN orders o ON o.merchant_id = w.merchant_id
-       WHERE o.id = $2 AND w.is_active = true
-       ON CONFLICT (webhook_id, order_status_event_id) DO NOTHING`,
-      [event.id, orderId],
-    );
-    await client.query(
-      `INSERT INTO outbox_events (topic, aggregate_type, aggregate_id, payload)
-       VALUES ('order.status_changed', 'order', $1,
-         jsonb_build_object(
-           'event_id', $2::text,
-           'order_id', $1::text,
-           'from_status', $3::text,
-           'to_status', $4::text,
-           'occurred_at', $5::timestamptz
-         ))`,
-      [orderId, event.id, order.status, toStatus, event.occurred_at],
-    );
+    const event = await writeOrderStatusChange(client, orderId, order.status, toStatus, actor.userId);
     await client.query('COMMIT');
 
     return {
@@ -112,4 +83,3 @@ export const transitionOrder = async (
     client.release();
   }
 };
-
